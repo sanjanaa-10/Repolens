@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" width="64" height="64">
+  <!-- RepoLens mark: a minimal geometric lens merged with a code-bracket motif -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6366f1"/>
+      <stop offset="1" stop-color="#818cf8"/>
+    </linearGradient>
+  </defs>
+  <!-- right angle bracket (code) -->
+  <path d="M17 22 L9 32 L17 42" stroke="#a3a3b0" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- left angle bracket (code) -->
+  <path d="M47 22 L55 32 L47 42" stroke="#a3a3b0" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- lens -->
+  <circle cx="32" cy="32" r="13" fill="url(#g)"/>
+  <circle cx="32" cy="32" r="13" fill="none" stroke="url(#g)" stroke-width="1"/>
+</svg>

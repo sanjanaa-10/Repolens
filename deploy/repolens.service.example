@@ -1,0 +1,35 @@
+# RepoLens backend systemd unit reference (Linux).
+#
+# Runs the uvicorn backend bound to 127.0.0.1 so it is only reachable
+# through the reverse proxy. adapt User=, WorkingDirectory=, and the venv
+# path to your install. Enable/start:
+#
+#   sudo cp deploy/repolens.service /etc/systemd/system/repolens.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now repolens
+#
+# The service reads backend/.env (or exported REPOLENS_* variables). See
+# DEPLOYMENT.md.
+
+[Unit]
+Description=RepoLens backend (analyzer + API)
+After=network.target
+
+[Service]
+Type=simple
+User=repolens
+Group=repolens
+WorkingDirectory=/srv/repolens/backend
+# Production: disable debug, allow only the public hostnames in the proxy.
+EnvironmentFile=/srv/repolens/backend/.env
+ExecStart=/srv/repolens/backend/.venv/bin/python -m uvicorn app.main:app \
+    --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=3
+# Data + clone storage live under backend/data; keep it writable by User=.
+ReadWritePaths=/srv/repolens/backend/data
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

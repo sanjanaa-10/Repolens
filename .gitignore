@@ -1,0 +1,49 @@
+# --- Python / backend ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+backend/data/
+backend/dist/
+*.db
+*.sqlite3
+
+# --- Node / frontend ---
+node_modules/
+frontend/dist/
+frontend/.vite/
+npm-debug.log*
+*.tsbuildinfo
+frontend/vite.config.js
+frontend/vite.config.d.ts
+
+# --- Coverage ---
+coverage/
+htmlcov/
+.coverage
+
+# --- Environment / secrets ---
+.env
+.env.local
+.env.*.local
+!.env.example
+*.pem
+
+# --- Repositories cloned at runtime (never commit) ---
+data/repositories/
+**/cloned_repos/
+**/tmp_repos/
+
+# --- Editor / OS ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# --- Misc logs ---
+*.log

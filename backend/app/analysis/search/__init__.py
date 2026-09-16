@@ -1,0 +1,1 @@
+"""Repository-scoped search: symbols, files, and source text."""

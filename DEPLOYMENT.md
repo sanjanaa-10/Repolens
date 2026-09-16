@@ -1,0 +1,182 @@
+# RepoLens — Deployment + Operations
+
+**Understand the code before you change it.**
+
+This is the Phase 10 deployment and operations guide. It documents how to run
+RepoLens in production against the **already-hardened** Phase 9 codebase, the
+intended production topology (reverse proxy + TLS in front of a loopback-bound
+backend, static frontend build), the environment variables that control a
+production install, backups, and operational checks.
+
+Per the audited scope in [SECURITY.md](./SECURITY.md) and
+[PHASE9_REPORT.md](./docs/development/PHASE9_REPORT.md), RepoLens is a **local, single-user**
+tool. No authentication/authorization, multi-user, OAuth, private repos,
+Docker/Kubernetes, or distributed workers are implemented or planned. Phase 10
+therefore does **not** add Docker or CI; it provides the reference deployment
+for the architecture that actually exists.
+
+---
+
+## 1. Production topology
+
+```
+                         Internet
+                            |
+                     [ reverse proxy + TLS ]
+                     (Caddy or nginx, deploy/)
+                    /                    \
+        static /api proxied               static frontend build
+        to backend 127.0.0.1:8000         frontend/dist (SPA)
+                 |
+        [ uvicorn backend, 127.0.0.1:8000 ]
+        REPOLENS_TRUSTED_HOSTS = public hostnames
+        backend/.env -> storage + Lens options
+                 |
+        SQLite (backend/data/repolens.db)
+        cloned repositories (backend/data/repositories/)
+```
+
+- The **frontend** is a static Vite build. Serve `frontend/dist` over HTTPS.
+- The **backend** is uvicorn/FastAPI, bound to `127.0.0.1`, reachable only
+  through the proxy. It serves `/api/*`.
+- The SPA needs an index fallback (`/index.html`) for client-side routes and an
+  `/api/*` proxy to the backend — both are shown in the reference configs.
+
+---
+
+## 2. Prerequisites
+
+- Python 3.12
+- Node 18+ and npm (to build the frontend)
+- A public hostname and (recommended) a TLS certificate
+- A reverse proxy binary: Caddy (automatic TLS) or nginx (with your certs)
+
+---
+
+## 3. Build
+
+```bash
+# Backend dependencies
+cd backend
+py -3.12 -m venv .venv
+.\.venv\Scripts\python -m pip install -r requirements.txt   # PowerShell
+# or: .venv/bin/python -m pip install -r requirements.txt   # Linux/macOS
+
+# Frontend production build
+cd ../frontend
+npm ci
+npm run build            # compiles to frontend/dist
+```
+
+`npm run build` runs `tsc -b` (typecheck) and `vite build`.
+
+---
+
+## 4. Configure the backend environment
+
+Copy one of the templates to `backend/.env` and edit:
+
+```bash
+cp deploy/env.production.example backend/.env
+```
+
+The three production-critical settings:
+
+| Variable | What to set |
+| --- | --- |
+| `REPOLENS_DEBUG` | `false` in production |
+| `REPOLENS_TRUSTED_HOSTS` | the public hostnames your proxy serves (comma-separated). **Required** — `TrustedHostMiddleware` rejects any other `Host` header. |
+| `REPOLENS_REPO_STORAGE_DIR` / `REPOLENS_DB_PATH` | absolute paths on persistent, backed-up storage |
+
+Optional Lens: uncomment `REPOLENS_AI_PROVIDER`, `REPOLENS_AI_API_KEY`,
+`REPOLENS_AI_MODEL`, `REPOLENS_AI_BASE_URL`. Without a key the deterministic
+core is fully functional and Lens returns `503`.
+
+See [.env.example](./.env.example) and [deploy/env.production.example](./deploy/env.production.example)
+for the full list and defaults.
+
+---
+
+## 5. Run the backend
+
+Development (loopback only, auto-reload):
+
+```bash
+cd backend
+.\.venv\Scripts\python -m uvicorn app.main:app --reload --port 8000
+```
+
+Production (loopback only, no reload). On Linux use the reference systemd unit
+[deploy/repolens.service.example](./deploy/repolens.service.example):
+
+```bash
+cd backend
+.\.venv\Scripts\python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+Health check: `curl http://127.0.0.1:8000/api/health`.
+
+---
+
+## 6. Frontend serving + reverse proxy
+
+Serve the static build and proxy `/api`. Reference configs:
+
+- [deploy/Caddyfile.example](./deploy/Caddyfile.example) — recommended; Caddy
+  obtains and renews TLS automatically.
+- [deploy/nginx.example.conf](./deploy/nginx.example.conf) — nginx + your
+  certificates.
+
+Both enable TLS, serve `frontend/dist` with an SPA fallback, and proxy `/api/*`
+to `127.0.0.1:8000`. In every case make sure `REPOLENS_TRUSTED_HOSTS` matches
+the served hostname, or the backend rejects the proxy's requests.
+
+---
+
+## 7. Backups & data locations
+
+All persistent state lives under `backend/data/`:
+
+| Path | Contents | Backup importance |
+| --- | --- | --- |
+| `backend/data/repolens.db` | SQLite DB: repositories, symbols, relationships, diffs, impact, reviews, Lens audits | High — this is the analysis state |
+| `backend/data/repositories/<owner>__<name>__<token>/` | Cloned working trees (read-only) | Low — re-cloneable; only metadata is persisted in the DB |
+
+Recommended: take a consistent snapshot of `repolens.db` (e.g. `sqlite3
+backend/data/repolens.db ".backup ..."` on a schedule). Working trees can be
+regenerated by re-ingesting. To migrate backups, set
+`REPOLENS_DB_PATH`/`REPOLENS_REPO_STORAGE_DIR` to the new location and restart.
+
+---
+
+## 8. Operational checks
+
+- **Health:** `GET /api/health` returns `{"status":"ok"}`.
+- **Trusted hosts:** send a request with the wrong `Host` header and confirm
+  the backend returns `400` — this proves the proxy stack is gated.
+- **Lens:** without a key, any lens endpoint returns `503 PROVISIONING` /
+  `PROVIDER_UNAVAILABLE`; with a key, run one lens call and verify a
+  metadata-only `LensAudit` row appears (no prompts/snippets/keys stored).
+- **Reset:** to start clean, stop the backend and remove `backend/data`
+  (deletes the DB and all clones), then restart — the DB is rebuilt
+  idempotently on startup.
+
+---
+
+## 9. Security reminders (from SECURITY.md)
+
+- Do not expose the raw uvicorn backend to the internet; always reverse-proxy
+  it and terminate TLS in front.
+- Never commit `backend/.env` or paste an LLM key into a repository being
+  analyzed. The key is read from the environment only and never logged.
+- `REPOLENS_TRUSTED_HOSTS` is your host-allowlist — keep it tight.
+- The frontend dev server (`vite dev`) is a development tool only.
+
+---
+
+## 10. Roadmap status
+
+Phase 10 completes the roadmap. Phases 0–9 are feature-complete and verified:
+the full backend suite passes (249 passed / 2 skipped / 4 deselected / 1 warning) and the
+frontend typecheck + production build both pass. See
+[PHASE10_REPORT.md](./docs/development/PHASE10_REPORT.md) for the phase summary.

@@ -1,0 +1,39 @@
+# RepoLens production reverse-proxy reference (Caddy).
+#
+# Caddy automatically obtains and renews TLS certificates and re-writes
+# http -> https. This is the recommended, lowest-effort production serving
+# path. Copy to your host, replace the site address, and reload.
+#
+# The frontend is served as a static Vite build (frontend/dist) and the
+# backend /api routes are proxied to the uvicorn backend bound to
+# 127.0.0.1:8000. This keeps the raw backend off the public internet.
+#
+# Prereqs:
+#   - Set REPOLENS_TRUSTED_HOSTS on the backend to exactly the hostnames you
+#     use below (e.g. repolens.example.com), or TrustedHostMiddleware will
+#     reject requests.
+#   - Build the frontend first:  cd frontend && npm ci && npm run build
+#   - Run the backend on 127.0.0.1:8000 (see DEPLOYMENT.md).
+#
+# Replace repolens.example.com twice (site address + trusted host guidance).
+
+repolens.example.com {
+	# Static frontend build.
+	root * /srv/repolens/frontend/dist
+	file_server
+
+	# SPA fallback: serve index.html for client-side routes.
+	try_files {path} {path}/ /index.html
+
+	# Proxy the backend API. The backend owns /api and all sub-resources.
+	handle /api/* {
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	# Production hardening headers are served by the backend itself; add a
+	# final CSRF/HSTS layer here if your reverse proxy does not set it.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+	}
+}
