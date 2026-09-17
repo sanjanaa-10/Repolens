@@ -4,8 +4,7 @@ RepoLens is a local single-user developer tool that ingests a public GitHub
 repository, deterministically analyzes it (symbols, diffs, impact, review), and
 optionally explains findings through an LLM (`Lens`). This page describes how
 the tool is hardened, what it intentionally does not do, and how to operate it
-safely. The full pre-change inventory, risks, and mitigations are captured in the
-final Phase 9 report: [PHASE9_REPORT.md](./docs/development/PHASE9_REPORT.md).
+safely.
 
 ## Trust model
 
@@ -61,8 +60,7 @@ final Phase 9 report: [PHASE9_REPORT.md](./docs/development/PHASE9_REPORT.md).
 No authentication or authorization, multi-user support, OAuth, private
 repositories, code execution, background workers, Redis/Kubernetes/Docker
 deployment, or vulnerability scanning are implemented or planned in the current
-scope (see the audited scope section of docs/development/PHASE9_REPORT.md for the full list of
-out-of-scope items). Secret data *inside an analyzed repository* is redacted at
+scope. Secret data *inside an analyzed repository* is redacted at
 external boundaries but is not a substitute for removing credentials from the
 source repository.
 
