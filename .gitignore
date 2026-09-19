@@ -47,3 +47,4 @@ Thumbs.db
 
 # --- Misc logs ---
 *.log
+.opencode-dump.ps1

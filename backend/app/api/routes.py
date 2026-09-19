@@ -342,6 +342,41 @@ async def list_symbols(
     return SymbolsResponse(items=items, total=total)
 
 
+@router.get(
+    "/repositories/{repository_id}/symbols/{symbol_id}",
+    response_model=SymbolInfo,
+)
+async def get_symbol(
+    repository_id: int,
+    symbol_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> SymbolInfo:
+    """Return one extracted symbol by id (repository-scoped)."""
+    row = await db.get(Repository, repository_id)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Repository not found.",
+        )
+    symbol_row = (
+        await db.execute(
+            select(Symbol, FileRecord.path)
+            .join(FileRecord, Symbol.file_id == FileRecord.id)
+            .where(
+                Symbol.repository_id == repository_id,
+                Symbol.id == symbol_id,
+            )
+        )
+    ).one_or_none()
+    if symbol_row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Symbol not found.",
+        )
+    symbol, path = symbol_row
+    return symbol_to_info(symbol, path)
+
+
 @router.get("/repositories/{repository_id}/imports", response_model=list[ImportInfo])
 async def list_imports(
     repository_id: int,

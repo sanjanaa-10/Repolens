@@ -252,3 +252,59 @@ async def test_investigation_isolation_between_repos(inv_env, tmp_path) -> None:
         f"/api/repositories/{repo_id}/symbols/{sym_id}/investigation"
     )
     assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_symbol_detail_endpoint(inv_env, tmp_path) -> None:
+    """GET /symbols/{id} returns the full symbol record scoped to its repo."""
+    client, maker, _ = inv_env
+    root = tmp_path / "inv_fixture"
+    _build_investigation_repo(root)
+    repo_id = await _seed_and_parse(maker, root, "detail")
+
+    sym_id = await _get_symbol_id(maker, repo_id, "AuthService", "CLASS")
+    resp = await client.get(f"/api/repositories/{repo_id}/symbols/{sym_id}")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["id"] == sym_id
+    assert body["name"] == "AuthService"
+    assert body["kind"] == "CLASS"
+    assert body["file_path"] == "auth/service.py"
+    assert body["line_start"] > 0
+
+
+@pytest.mark.asyncio
+async def test_symbol_detail_unknown_symbol_404(inv_env, tmp_path) -> None:
+    """A symbol id that does not exist in the repo returns 404."""
+    client, maker, _ = inv_env
+    root = tmp_path / "inv_fixture"
+    _build_investigation_repo(root)
+    repo_id = await _seed_and_parse(maker, root, "detail404")
+
+    resp = await client.get(f"/api/repositories/{repo_id}/symbols/999999")
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_symbol_detail_unknown_repo_404(inv_env, tmp_path) -> None:
+    """Fetching a symbol in an unknown repository returns 404."""
+    client, maker, _ = inv_env
+    resp = await client.get("/api/repositories/99999/symbols/1")
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_symbol_detail_isolation_between_repos(inv_env, tmp_path) -> None:
+    """A symbol cannot be fetched through a different repository's scope."""
+    client, maker, _ = inv_env
+    root = tmp_path / "inv_fixture"
+    _build_investigation_repo(root)
+    repo_a = await _seed_and_parse(maker, root, "iso_a")
+    repo_b = await _seed_and_parse(maker, root, "iso_b")
+    sym_id = await _get_symbol_id(maker, repo_a, "AuthService", "CLASS")
+
+    ok = await client.get(f"/api/repositories/{repo_a}/symbols/{sym_id}")
+    assert ok.status_code == 200
+
+    leak = await client.get(f"/api/repositories/{repo_b}/symbols/{sym_id}")
+    assert leak.status_code == 404

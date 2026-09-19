@@ -1,22 +1,22 @@
-import { useEffect, useState } from "react";
-import { NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
+﻿import { NavLink as RouterNavLink, Outlet, useNavigate, useParams } from "react-router-dom";
 import { Search, GitBranch, CircleDot } from "lucide-react";
 import { Logo } from "../ui/Logo";
 import { cn } from "../../lib/utils";
-import { getRepository } from "../../api/client";
-import type { AnalysisStatus, RepositoryInfo } from "../../types";
+import { useRepository } from "../../hooks/useRepository";
+import type { AnalysisStatus } from "../../types";
 
 const navItems = [
-  { to: "", label: "Overview", end: true },
-  { to: "investigate", label: "Explore" },
-  { to: "changes", label: "Changes" },
-  { to: "review", label: "Review" },
+  { to: "", label: "Overview", end: true, num: 1 },
+  { to: "investigate", label: "Investigate", num: 2 },
+  { to: "changes", label: "Changes", num: 3 },
+  { to: "impact", label: "Impact", num: 4 },
+  { to: "review", label: "Review", num: 5 },
 ];
 
 const STATUS_LABEL: Record<AnalysisStatus, string> = {
   pending: "Pending",
-  cloning: "Cloning repository…",
-  indexing: "Indexing files…",
+  cloning: "Cloning repositoryâ€¦",
+  indexing: "Indexing filesâ€¦",
   ready: "Indexed and ready",
   failed: "Ingestion failed",
 };
@@ -24,38 +24,22 @@ const STATUS_LABEL: Record<AnalysisStatus, string> = {
 export function AppShell() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [repo, setRepo] = useState<RepositoryInfo | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    if (!id) return;
-    getRepository(Number(id))
-      .then((data) => {
-        if (active) setRepo(data);
-      })
-      .catch(() => {
-        if (active) setRepo(null);
-      });
-    return () => {
-      active = false;
-    };
-  }, [id]);
+  const { repo } = useRepository(id);
 
   return (
-    <div className="flex h-screen w-full flex-col overflow-hidden bg-ink">
+    <div className="flex h-screen flex-col bg-ink">
       {/* Top bar */}
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-line bg-ink-900 px-4">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <Logo />
-          <div className="hidden h-5 w-px bg-line md:block" />
-          <div className="hidden items-center gap-2 text-sm text-text-secondary md:flex">
+          <div className="flex items-center gap-1.5 text-sm text-text-secondary">
             <CircleDot className="h-3.5 w-3.5 text-accent-hover" />
             <span className="font-medium text-text-primary">
               {repo ? `${repo.owner}/${repo.name}` : "repository"}
             </span>
             <span className="text-text-muted">/</span>
             <GitBranch className="h-3.5 w-3.5 text-text-muted" />
-            <span className="text-text-muted">{repo?.branch ?? "—"}</span>
+            <span className="text-text-muted">{repo?.branch ?? "â€”"}</span>
           </div>
         </div>
         <button
@@ -67,7 +51,7 @@ export function AppShell() {
           <Search className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">Search code</span>
           <kbd className="ml-2 hidden rounded border border-line bg-ink-900 px-1.5 py-0.5 font-mono text-[10px] text-text-faint sm:inline">
-            ⌘K
+            âŒ˜K
           </kbd>
         </button>
       </header>
@@ -77,7 +61,7 @@ export function AppShell() {
         <aside className="flex w-56 shrink-0 flex-col border-r border-line bg-ink-900">
           <nav className="flex flex-col gap-0.5 p-3" aria-label="Primary">
             {navItems.map((item) => (
-              <NavLink
+              <RouterNavLink
                 key={item.to}
                 to={item.to}
                 end={item.end}
@@ -90,8 +74,16 @@ export function AppShell() {
                   )
                 }
               >
+                <span className="mr-2 inline-flex h-4 w-4 items-center justify-center rounded-full bg-ink-700 text-[10px] tabular-nums text-text-faint">
+                  {item.num}
+                </span              >
+                {item.num !== undefined && (
+                  <span className="mr-2.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-ink-700 text-[10px] font-medium tabular-nums text-text-secondary">
+                    {item.num}
+                  </span>
+                )}
                 {item.label}
-              </NavLink>
+              </RouterNavLink>
             ))}
           </nav>
 
@@ -102,7 +94,7 @@ export function AppShell() {
             <p className="mt-1 text-xs text-text-secondary">
               {repo
                 ? STATUS_LABEL[repo.status]
-                : "Loading repository status…"}
+                : "Loading repository statusâ€¦"}
             </p>
             {repo && repo.status === "ready" && (
               <p className="mt-1 text-[11px] text-text-faint">

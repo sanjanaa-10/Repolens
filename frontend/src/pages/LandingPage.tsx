@@ -22,6 +22,22 @@ import { getRepositories, ingestRepository } from "../api/client";
 
 const INGEST_STEPS = ["Cloning repository…", "Indexing source files…"];
 
+function isValidGithubUrl(raw: string): boolean {
+  const trimmed = raw.trim();
+  if (!trimmed) return false;
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return false;
+  const host = parsed.hostname.toLowerCase();
+  if (host !== "github.com" && !host.endsWith(".github.com")) return false;
+  const parts = parsed.pathname.split("/").filter(Boolean);
+  return parts.length >= 2;
+}
+
 // ---------- Background relationship visualization ----------
 
 interface GraphNode {
@@ -212,6 +228,12 @@ export function LandingPage() {
       setError("Paste a public GitHub repository URL first.");
       return;
     }
+    if (!isValidGithubUrl(url)) {
+      setError(
+        "Enter a GitHub repository URL, e.g. https://github.com/pallets/itsdangerous"
+      );
+      return;
+    }
     setError(null);
     setLoading(true);
     setStep(0);
@@ -251,7 +273,7 @@ export function LandingPage() {
       </header>
 
       {/* Hero */}
-      <section className="relative flex min-h-[92vh] flex-col items-center justify-center overflow-hidden px-6 pt-24 pb-16">
+      <section className="relative flex min-h-[86vh] flex-col items-center justify-center overflow-hidden px-6 pt-24 pb-14">
         <div className="bg-grid bg-grid-fade absolute inset-0" aria-hidden="true" />
 
         {/* Circulating relationship graph behind hero — masked to stay clear of the headline */}
@@ -265,7 +287,7 @@ export function LandingPage() {
               "radial-gradient(ellipse 60% 55% at 50% 40%, transparent 0%, black 60%)",
           }}
         >
-          <div className="relative h-[70vh] w-full max-w-3xl translate-y-6">
+          <div className="relative h-[48vh] w-full max-w-2xl translate-y-8">
             <HeroVisual dimmed={dimHero} />
           </div>
         </div>
@@ -276,24 +298,13 @@ export function LandingPage() {
           animate={reduce ? undefined : { opacity: 1, y: 0 }}
           transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
         >
-          <h1 className="text-balance text-5xl font-semibold leading-[1.05] tracking-tight sm:text-6xl md:text-7xl">
-            <span className="text-glow text-text-primary">
-              UNDERSTAND THE CODE
-            </span>
-            <br />
-            <span className="text-accent-hover">BEFORE YOU CHANGE IT.</span>
+          <h1 className="text-balance text-4xl font-semibold leading-[1.1] tracking-tight sm:text-5xl md:text-6xl">
+            Understand the impact of your code changes.
           </h1>
 
-          <p className="mx-auto mt-6 max-w-xl text-pretty text-base leading-relaxed text-text-secondary sm:text-lg">
+          <p className="mx-auto mt-5 max-w-xl text-pretty text-base leading-relaxed text-text-secondary sm:text-lg">
             RepoLens maps real code relationships inside your repository to
-            reveal how your changes could ripple through an unfamiliar codebase.
-          </p>
-
-          <p className="mt-4 flex items-center gap-2 text-xs text-text-muted">
-            <kbd className="rounded border border-line bg-ink-800 px-1.5 py-0.5 font-mono text-text-faint">
-              ⌘K
-            </kbd>
-            Command palette
+            reveal how a change could ripple through before you touch it.
           </p>
 
           {/* URL form */}
@@ -308,12 +319,12 @@ export function LandingPage() {
                 <Input
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
-                  placeholder="https://github.com/psf/requests"
+                  placeholder="https://github.com/pallets/itsdangerous"
                   aria-label="GitHub repository URL"
                   className="h-12 pl-10 text-sm"
                 />
               </div>
-<Button
+              <Button
               type="submit"
               size="lg"
               isLoading={loading}
@@ -340,7 +351,7 @@ export function LandingPage() {
                 className="shrink-0"
                 onClick={() => navigate(`/repo/${firstRepoId}`)}
               >
-                View Demo / Example
+                Try Demo
                 <ArrowRight className="h-4 w-4" />
               </Button>
             ) : (
@@ -357,7 +368,7 @@ export function LandingPage() {
                 }
                 className="shrink-0"
               >
-                View Demo / Example
+                Try Demo
                 <ArrowRight className="h-4 w-4" />
               </Button>
             )}
@@ -373,7 +384,8 @@ export function LandingPage() {
               </motion.p>
             )}
             <p className="mt-3 text-xs text-text-faint">
-              Public GitHub repositories · Python · TypeScript · JavaScript
+              Static analysis · Python · JavaScript · TypeScript · No repository
+              code execution
             </p>
           </form>
         </motion.div>
